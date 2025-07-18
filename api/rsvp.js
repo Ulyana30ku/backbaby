@@ -1,11 +1,16 @@
 import fetch from 'node-fetch';
 import nodemailer from 'nodemailer';
 
+// Добавляем проверку переменных окружения
+console.log('GMAIL_USER:', process.env.GMAIL_USER ? 'Set' : 'Not set');
+console.log('GMAIL_PASS:', process.env.GMAIL_PASS ? 'Set' : 'Not set');
+console.log('NOTIFICATION_EMAIL:', process.env.NOTIFICATION_EMAIL ? 'Set' : 'Not set');
+
 const transporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
+    user: process.env.GMAIL_USER || 'ukukovskaya@gmail.com',
+    pass: process.env.GMAIL_PASS || 'ulyana30kukovskaya'
   }
 });
 
@@ -25,29 +30,42 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Received request body:', req.body);
+    
     // Отправляем данные в Google Script
     const response = await fetch('https://script.google.com/macros/s/AKfycbykM71CnXcpxnlp8rB70B9v1vkE_dwfRSM7f2Y8ug_5acvqCm5he-i4khASBcR7WLorhQ/exec?action=submitRSVP', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
     });
+    
+    console.log('Google Script response status:', response.status);
     const data = await response.json();
+    console.log('Google Script response data:', data);
 
     // Если Google Script успешно обработал запрос, отправляем email
     if (response.ok) {
+      console.log('Attempting to send email notification...');
       await sendEmailNotification(req.body);
     }
 
     res.status(response.status).json(data);
   } catch (err) {
+    console.error('Error in handler:', err);
     res.status(500).json({ error: 'Proxy error', details: err.message });
   }
 }
 
 async function sendEmailNotification(rsvpData) {
+  // Проверяем, что переменные окружения установлены
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS || !process.env.NOTIFICATION_EMAIL) {
+    console.error('Missing environment variables for email');
+    return;
+  }
+
   const mailOptions = {
-    from: process.env.GMAIL_USER,
-    to: process.env.NOTIFICATION_EMAIL,
+    from: process.env.GMAIL_USER || 'ukukovskaya@gmail.com',
+    to: process.env.NOTIFICATION_EMAIL || 'kukovskaya04@gmail.com',
     subject: 'Новое RSVP подтверждение',
     html: `
       <h2>Новое подтверждение участия</h2>
@@ -66,5 +84,6 @@ async function sendEmailNotification(rsvpData) {
     console.log('Email notification sent successfully');
   } catch (error) {
     console.error('Error sending email:', error);
+    // НЕ выбрасываем ошибку, чтобы не ломать основной функционал
   }
 }
