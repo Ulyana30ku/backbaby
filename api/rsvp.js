@@ -1,4 +1,13 @@
 import fetch from 'node-fetch';
+import nodemailer from 'nodemailer';
+
+const transporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS
+  }
+});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,14 +25,46 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Отправляем данные в Google Script
     const response = await fetch('https://script.google.com/macros/s/AKfycbykM71CnXcpxnlp8rB70B9v1vkE_dwfRSM7f2Y8ug_5acvqCm5he-i4khASBcR7WLorhQ/exec?action=submitRSVP', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
     });
     const data = await response.json();
+
+    // Если Google Script успешно обработал запрос, отправляем email
+    if (response.ok) {
+      await sendEmailNotification(req.body);
+    }
+
     res.status(response.status).json(data);
   } catch (err) {
     res.status(500).json({ error: 'Proxy error', details: err.message });
+  }
+}
+
+async function sendEmailNotification(rsvpData) {
+  const mailOptions = {
+    from: process.env.GMAIL_USER,
+    to: process.env.NOTIFICATION_EMAIL,
+    subject: 'Новое RSVP подтверждение',
+    html: `
+      <h2>Новое подтверждение участия</h2>
+      <p><strong>Имя:</strong> ${rsvpData.name}</p>
+      <p><strong>Email:</strong> ${rsvpData.email || 'Не указан'}</p>
+      <p><strong>Телефон:</strong> ${rsvpData.phone || 'Не указан'}</p>
+      <p><strong>Присутствие:</strong> ${rsvpData.attending ? 'Да' : 'Нет'}</p>
+      <p><strong>Количество гостей:</strong> ${rsvpData.guests || 1}</p>
+      <p><strong>Сообщение:</strong> ${rsvpData.message || 'Не указано'}</p>
+      <p><strong>Время:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Email notification sent successfully');
+  } catch (error) {
+    console.error('Error sending email:', error);
   }
 }
