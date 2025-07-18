@@ -16,22 +16,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('Received request body:', req.body);
-    
-    // Отправляем данные в Google Script
     const response = await fetch('https://script.google.com/macros/s/AKfycbykM71CnXcpxnlp8rB70B9v1vkE_dwfRSM7f2Y8ug_5acvqCm5he-i4khASBcR7WLorhQ/exec?action=submitRSVP', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
     });
-    
-    console.log('Google Script response status:', response.status);
     const data = await response.json();
-    console.log('Google Script response data:', data);
-
     res.status(response.status).json(data);
   } catch (err) {
-    console.error('Error in handler:', err);
     res.status(500).json({ error: 'Proxy error', details: err.message });
   }
 }
